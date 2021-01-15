@@ -2,6 +2,7 @@
 
 import sys
 import json, yaml
+import re
 import requests
 
 print("args are %s " % sys.argv)
@@ -31,8 +32,8 @@ def main():
             print("Unable to parse line = \"%s\", skipping" % line)
             continue
 
-        # rename everything, apply counters, etc. Returns a fully
-        # formed TSDS update message
+        # rename everything, apply counters, etc. Adds a fully
+        # formed TSDS update message to the `block` list
         datatransformer.update(data, block)
 
         if len(block) >= 10:
@@ -41,14 +42,19 @@ def main():
 
 
 def _send_data(config, data):
-    json_data  = json.dumps(data)
+    try:
+        json_data  = json.dumps(data)
+    except:
+        print("***************** Bad data was %s ***************" % data)
+        sys.exit(1)
+        return
     tsds_creds = config.credentials()
     result     = requests.post(tsds_creds['url'] + "/services/push.cgi", 
                                data = {"method": "add_data", "data": json_data}, 
                                auth = (tsds_creds['username'], tsds_creds['password']))
 
     # TODO: error handling here, at least log it
-    print(result.text)
+    #print(result.text)
 
 
 # Some helper classes
@@ -130,7 +136,7 @@ class DataTransformer(object):
             "interval": interval,
             "type": tsds_data_name
         }
-        #print(tsds_data)
+        #print("Data = %s" % tsds_data)
 
         block.append(tsds_data)
 
@@ -144,7 +150,22 @@ class DataTransformer(object):
                 opt_to   = opt_config['to']
                 opt_from = opt_config['from']
 
-                if opt_from in tags:
+                # Handle wildcarding, we're building an array
+                if "*" in opt_from:
+                    array = []                                   
+
+                    for tag in tags:
+                        if re.match(opt_from, tag):
+                            if opt_config.get('field_name'):
+                                array.append({opt_config['field_name']: tags[tag]})
+                            else:
+                                array.append(tags[tag])
+
+                    if array:
+                        metadata[opt_to] = array
+                        has_any = True
+
+                elif opt_from in tags:
                     metadata[opt_to] = tags[opt_from]
                     has_any = True
 
@@ -154,6 +175,8 @@ class DataTransformer(object):
                     "time": timestamp,
                     "type": tsds_data_name + ".metadata"
                 }
+
+                #print("Optional meta = %s" % metadata_data)
 
                 block.append(metadata_data)
 

@@ -16,6 +16,10 @@
       optional_metadata:
           - from: ifAlias
             to: description
+          # Take all the ip addresses and roll them up
+          - from: ip_address_*
+            to: interface_address
+            field_name: value
       fields:
           - from: ifInErrors
             to: inerror
@@ -29,10 +33,10 @@
           - from: ifHCOutOctets
             to: output
             rate: true
-          - from: ifInUcastPkts
+          - from: ifHCInUcastPkts
             to: inUcast
             rate: true
-          - from: ifOutUcastPkts
+          - from: ifHCOutUcastPkts
             to: outUcast
             rate: true
           - from: ifInDiscards
